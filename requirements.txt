@@ -1,0 +1,9 @@
+# Data loading and exploration (this stage)
+datasets>=2.19
+pandas>=2.2
+scikit-learn>=1.4
+matplotlib>=3.8
+seaborn>=0.13
+
+# Added later as the project progresses: transformers, peft, bitsandbytes,
+# accelerate, mlflow, azure-ai-ml, azure-identity
