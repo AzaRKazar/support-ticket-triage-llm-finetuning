@@ -79,3 +79,45 @@ baseline eval ran in the background. **Not yet executed anywhere** —
 bitsandbytes 4-bit quantization requires CUDA, unavailable until GPU
 quota is actually granted. Written to standard, well-established QLoRA
 patterns, but unverified until it runs on real GPU compute.
+
+## 2026-08-17 — GPU quota still blocked; pivoted to local GPU training
+
+Re-checked Azure GPU quota (all 31 eligible regions again): still 0
+everywhere. Investigated why rather than just re-confirming the fact --
+subscription's `quotaId` is `PayAsYouGo_2014-09-01` (checked via
+`az rest` against the subscription resource directly), which rules out
+the free-trial dead end. Most likely explanation: the earlier "support
+confirmed the VM series" response was general technical support
+confirming the SKU choice, not the separate, slower quota-approval queue
+that actually grants it -- confirmed this distinction is real by
+attempting the request through both the Portal's self-service Quotas
+blade and directly through the `az quota` API; both failed identically
+with `QuotaNotAvailableForResource`, meaning this specific GPU family
+requires a formal support ticket regardless of path. Filed one correctly
+this time (issue type "Service and subscription limits (quotas)", not
+a generic request) and left it pending -- Azure's turnaround, not
+something to keep re-checking.
+
+Rather than continue waiting, checked whether local training was
+actually viable instead of assuming CPU-only: this machine turned out to
+have an NVIDIA GTX 1660 Ti (Windows' WMI reported 4GB VRAM, which is a
+known 32-bit overflow bug in that field for cards with more --
+`nvidia-smi` confirmed the real number, 6GB). Swapped the CPU-only torch
+build for a CUDA build (`cu121` wheels) and ran a smoke test
+(`src/training/smoke_test_gpu.py`): loaded Qwen2.5-1.5B-Instruct in
+4-bit, attached LoRA adapters, ran one real forward+backward pass. Peak
+VRAM: 2.09GB out of 6.44GB available -- comfortable headroom, not a
+tight fit. Local QLoRA training is genuinely viable, not just
+theoretically possible.
+
+This doesn't abandon the Azure architecture -- it's the same fallback
+pattern the original brief already sanctioned for Colab (train
+elsewhere, register the resulting adapter to Azure ML afterward), just
+with a better fallback than Colab: no time limits, no session handling,
+and the training run's MLflow logging can still point at the Azure ML
+workspace's tracking URI remotely, so it still shows up in the
+workspace's experiment tracking even though the GPU doing the work isn't
+Azure's.
+
+Next: run the real training job for Project 2a on the full 22,841
+example training set.
