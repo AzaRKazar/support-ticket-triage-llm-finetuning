@@ -1,9 +1,22 @@
-# Data loading and exploration (this stage)
+# Data loading and exploration
 datasets>=2.19
 pandas>=2.2
 scikit-learn>=1.4
 matplotlib>=3.8
 seaborn>=0.13
 
-# Added later as the project progresses: transformers, peft, bitsandbytes,
-# accelerate, mlflow, azure-ai-ml, azure-identity
+# Model inference / evaluation
+# NOTE: torch installed separately via the CPU-only index (see README) to
+# avoid pulling unneeded CUDA packages on this local machine.
+transformers>=4.42
+accelerate>=0.30
+tqdm>=4.66
+
+# QLoRA fine-tuning (GPU-only: bitsandbytes 4-bit quantization requires CUDA,
+# so this environment only runs on the Azure ML GPU compute job, not locally)
+peft>=0.11
+bitsandbytes>=0.43
+trl>=0.9
+mlflow>=2.14
+
+# Added later: azure-ai-ml, azure-identity
