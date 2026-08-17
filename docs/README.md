@@ -108,9 +108,28 @@ Unparseable-output rate is also tracked, since a base model with no
 fine-tuning may not reliably follow the "respond with exactly one label"
 instruction.
 
-**Status:** running as of this writing. Results (`results/baseline/`)
-will be added here once complete, followed by the same evaluation run
-against the fine-tuned model for direct comparison.
+**Status:** complete. Full results in `results/baseline/` (metrics.json,
+predictions.csv, confusion_matrix.png).
+
+| Metric | Value |
+|---|---|
+| Accuracy | 55.6% |
+| Macro F1 | 0.483 |
+| Weighted F1 | 0.483 |
+| Unparseable output rate | 3.3% |
+
+Strongest categories (F1 ~0.95): `check_cancellation_fee`,
+`payment_issue`, `recover_password`. Complete failures (F1 = 0.0):
+`edit_account`, `get_refund`, `set_up_shipping_address`,
+`switch_account`, `track_refund` — all five turned out to be systematic
+collapses into a semantically adjacent category rather than random noise
+(e.g. `set_up_shipping_address` was predicted as `change_shipping_address`
+100% of the time; `track_refund` as `check_refund_policy` 100% of the
+time). The base model follows the output-format instruction fine but
+can't separate this dataset's fine-grained category boundaries — the
+gap fine-tuning is meant to close. Same evaluation will be re-run against
+the fine-tuned model on the identical 270-example sample once GPU compute
+is available.
 
 ## Key decisions and why
 

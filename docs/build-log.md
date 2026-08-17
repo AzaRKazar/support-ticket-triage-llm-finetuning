@@ -47,16 +47,29 @@ handling needed). Split 85/15 stratified by intent → 22,841 train /
 
 ## 2026-08-17 — Zero-shot baseline evaluation
 
-Evaluating the un-fine-tuned Qwen2.5-1.5B-Instruct via prompted
+Evaluated the un-fine-tuned Qwen2.5-1.5B-Instruct via prompted
 classification (system prompt lists all 27 valid intents, model must
-respond with exactly one). Running on a **stratified sample of 270**
+respond with exactly one). Ran on a **stratified sample of 270**
 (10 per class), not the full 4,031-example test set — this machine is
 CPU-only (i7-10750H, no native bf16 acceleration) and full-set inference
-would take many hours. At ~20 sec/example even the 270-example sample
-takes roughly 1.5 hours. The same 270-example sample will be reused for
-the fine-tuned model's evaluation later so the before/after comparison is
+would take many hours. The same 270-example sample will be reused for the
+fine-tuned model's evaluation later so the before/after comparison is
 apples-to-apples. This is a real methodological tradeoff, not a hidden
 one — noting it here and in the final results writeup.
+
+**Result:** took 1h21m. Accuracy 55.6%, macro F1 0.483, weighted F1
+0.483, 3.3% unparseable outputs. Strongest categories (F1 ~0.95):
+`check_cancellation_fee`, `payment_issue`, `recover_password`. Complete
+failures (F1 = 0.0): `edit_account`, `get_refund`,
+`set_up_shipping_address`, `switch_account`, `track_refund` — inspecting
+predictions showed these aren't random errors but systematic collapses
+into semantically adjacent categories (`set_up_shipping_address` →
+100% predicted as `change_shipping_address`; `track_refund` → 100%
+predicted as `check_refund_policy`; `switch_account` → 80% predicted as
+`change_order`). The base model can follow the instruction format but
+can't distinguish this dataset's fine-grained category boundaries —
+exactly the gap fine-tuning is meant to close. Full metrics, per-class
+report, predictions, and confusion matrix in `results/baseline/`.
 
 ## 2026-08-17 — QLoRA training script
 
