@@ -24,7 +24,7 @@ by intent, measured against a zero-shot baseline on the same model.
 
 ## Architecture
 
-```
+```text
 Azure ML Workspace -> Compute Cluster -> Training Job (QLoRA) -> MLflow tracking
                                                                        |
                                                                        v
@@ -33,8 +33,13 @@ Azure ML Workspace -> Compute Cluster -> Training Job (QLoRA) -> MLflow tracking
 
 ## Status
 
-Project scaffolding in progress. Metrics, confusion matrix, and business-impact
-analysis will be added here once training and evaluation are complete.
+In progress. Done so far: Azure ML workspace + compute cluster provisioned,
+dataset loaded/explored/split, zero-shot baseline evaluation running,
+QLoRA training script drafted (not yet run — waiting on GPU quota).
+See [`docs/build-log.md`](docs/build-log.md) for the running engineering
+log, including a couple of real mistakes made and caught along the way.
+Metrics, confusion matrix, and business-impact analysis will replace this
+section once training and evaluation are complete.
 
 ## Reproduce
 
