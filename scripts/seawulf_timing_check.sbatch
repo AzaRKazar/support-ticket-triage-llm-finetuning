@@ -23,11 +23,17 @@
 module load cuda120/toolkit/12.0
 module load anaconda/3-new
 
+# --system-site-packages: this node's GCC (4.8.5) is too old to build
+# numpy from source, which pip otherwise attempts because no manylinux
+# wheel matches this RHEL7-era glibc for recent numpy releases. Inheriting
+# anaconda/3-new's precompiled numpy/pandas/scikit-learn sidesteps that
+# build entirely instead of pinning around it.
 if [ ! -d ".venv" ]; then
-    python -m venv .venv
+    python -m venv --system-site-packages .venv
 fi
 source .venv/bin/activate
 
+pip install -q --upgrade pip
 pip install -q -r requirements.txt
 pip install -q torch --index-url https://download.pytorch.org/whl/cu121
 pip install -q bitsandbytes peft trl
