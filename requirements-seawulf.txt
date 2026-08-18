@@ -9,6 +9,9 @@ transformers>=4.42
 accelerate>=0.30
 tqdm>=4.66
 peft>=0.11
-bitsandbytes>=0.43
+# >=0.43 has no wheel compatible with this node's old glibc (pip caps at
+# 0.42.0 -- confirmed live, not guessed); 0.42.0 still has full 4-bit NF4
+# quantization support, which is all this project needs.
+bitsandbytes>=0.39,<0.43
 trl>=0.9
 mlflow>=2.14
