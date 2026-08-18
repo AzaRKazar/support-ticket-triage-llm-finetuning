@@ -213,3 +213,56 @@ Next: submit `scripts/seawulf_timing_check.sbatch` on the `v100`
 partition, inspect real step times, and decide between the Colab subset
 plan and a SeaWulf full-dataset run based on actual numbers -- same
 discipline as every other compute decision so far.
+
+## 2026-08-18 — SeaWulf abandoned: environment too old, not worth the fight
+
+Submitted the timing check repeatedly and fixed real issues one at a
+time, each confirmed live rather than guessed:
+
+1. `pip install -r requirements.txt` tried to build numpy from source
+   and failed -- node's system GCC is 4.8.5 (RHEL7-era), numpy needs
+   >=9.3. Root cause: `--system-site-packages` (meant to reuse
+   anaconda/3-new's precompiled numpy) doesn't help here because pip's
+   build isolation for packages like scikit-learn/scipy ignores it and
+   fetches its own numpy anyway. Fix: `requirements-seawulf.txt`
+   containing only what `train_qlora.py` actually imports (pandas,
+   datasets, transformers, accelerate, tqdm, peft, bitsandbytes, trl),
+   dropping scikit-learn/scipy/matplotlib/seaborn entirely since
+   training doesn't need them.
+2. `bitsandbytes>=0.43` had no compatible wheel for this node (pip's own
+   error listed available versions, capped at 0.42.0) -- relaxed the pin;
+   0.42.0 still has full 4-bit NF4 support.
+3. torch imported but crashed with a `libcusparse.so.12` /
+   `__nvJitLinkAddData_12_1` symbol mismatch. Diagnosed by forcing pip to
+   list every version it considered installable for
+   `nvidia-nvjitlink-cu12` and `nvidia-cusparse-cu12` (both go up to
+   CUDA 12.9 -- ruled out a version-availability problem). Real cause:
+   `module load cuda120/toolkit/12.0` put the system's own older
+   `libnvJitLink.so.12` ahead on `LD_LIBRARY_PATH`, which got loaded
+   instead of the newer one torch's pip wheel bundles, regardless of
+   what pip installed. Fix: stopped loading the system CUDA module
+   entirely -- not needed since torch's wheel is self-contained.
+   Confirmed fixed: GPU check then printed `CUDA: True` /
+   `Tesla V100-PCIE-32GB` correctly.
+4. `mlflow` (still in the requirements list at that point) pulls in
+   scipy as a dependency, hitting the identical GCC-too-old build
+   failure and aborting the whole install again. Dropped it -- both
+   sbatch scripts run `--report-to none` and `train_qlora.py` never
+   imports mlflow directly, so it wasn't needed.
+5. Even after removing mlflow, the same scipy build error recurred,
+   meaning something else in the requirements list also pulls it in
+   transitively -- not yet isolated which package.
+
+At that point, decided to stop rather than keep debugging this specific
+node's ancient toolchain package-by-package. The V100 hardware itself
+was confirmed real and fast (32GB VRAM, proper tensor cores), and every
+fix so far was a genuine, verified root cause rather than a guess -- but
+the cumulative time cost of fighting a RHEL7-era system environment
+outweighed the speed benefit over Colab for a portfolio project.
+`scripts/seawulf_timing_check.sbatch` and `scripts/seawulf_full_train.sbatch`
+are left in the repo, fixed as far as they got, as a record of the
+investigation and in case it's worth revisiting later.
+
+Reverted to the Colab plan from the previous entry: stratified
+10,000-example subset (370/class), 1 epoch, ~2.5 hours, already built in
+`notebooks/colab_train_qlora.ipynb`.
