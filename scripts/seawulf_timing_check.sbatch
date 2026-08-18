@@ -20,7 +20,15 @@
 # here). `nvidia-smi -L` via `srun` is what confirmed the actual hardware,
 # not the node/partition names.
 
-module load cuda120/toolkit/12.0
+# Deliberately NOT loading a system cuda module: torch's pip wheel
+# bundles its own complete CUDA 12.1 runtime via nvidia-*-cu12 packages.
+# Loading cuda120/toolkit/12.0 put its older libnvJitLink.so.12 ahead on
+# LD_LIBRARY_PATH, which got picked up instead of the newer pip-installed
+# one regardless of version -- explains why `pip install --upgrade
+# nvidia-nvjitlink-cu12` had no effect (confirmed: both packages have
+# wheels up to CUDA 12.9 available, so it wasn't a version-availability
+# problem at all). Only needed if compiling CUDA C++ from source, which
+# this job doesn't do.
 module load anaconda/3-new
 
 # --system-site-packages inherits anaconda/3-new's precompiled numpy/pandas,
@@ -38,11 +46,6 @@ source .venv/bin/activate
 pip install -q --upgrade pip
 pip install -q -r requirements-seawulf.txt
 pip install -q torch --index-url https://download.pytorch.org/whl/cu121
-# Known issue: pip can resolve nvidia-cusparse-cu12/nvidia-nvjitlink-cu12
-# (loose-range sub-deps of the cu121 torch wheel) to a mismatched pair,
-# causing "symbol __nvJitLinkAddData_12_1 ... not defined" on import.
-# Forcing nvjitlink to the latest available version is the documented fix.
-pip install -q --upgrade nvidia-nvjitlink-cu12
 
 echo "=== GPU check ==="
 python -c "import torch; print('CUDA:', torch.cuda.is_available()); print('Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'none')"

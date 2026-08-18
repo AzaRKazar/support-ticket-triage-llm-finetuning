@@ -21,7 +21,8 @@
 # check's per-step rate implies the full run needs longer, raise -t (up
 # to 24:00:00) before submitting rather than assuming 8 hours is enough.
 
-module load cuda120/toolkit/12.0
+# Not loading a system cuda module -- see seawulf_timing_check.sbatch for
+# why (its older libnvJitLink.so.12 conflicted with torch's bundled one).
 module load anaconda/3-new
 
 source .venv/bin/activate
