@@ -149,6 +149,34 @@ rather than Colab, since this is pure inference — a few hundred short
 generations — nowhere near the sustained load that caused local
 *training* to throttle. Full results in `results/finetuned/`.
 
+**Status:** complete.
+
+| Metric | Zero-shot baseline | Fine-tuned |
+|---|---|---|
+| Accuracy | 55.6% | 100% |
+| Macro F1 | 0.483 | 1.000 |
+| Weighted F1 | 0.483 | 1.000 |
+| Unparseable output rate | 3.3% | 0% |
+
+All five of the baseline's complete-failure categories (`edit_account`,
+`get_refund`, `set_up_shipping_address`, `switch_account`,
+`track_refund` — F1 0.0 zero-shot, each systematically collapsing into a
+semantically adjacent category) predict perfectly after fine-tuning, and
+predictions span the full 27-label space rather than collapsing —
+verified by inspecting `results/finetuned/predictions.csv` directly
+rather than trusting the aggregate metric alone.
+
+**Caveat worth stating plainly:** the Bitext dataset is templated/
+synthetic (placeholder slots like `{{Order Number}}`, heavily repeated
+phrasing patterns per intent — e.g. "cancel purchase X" / "help me
+canceling purchase X" for the same label). A fine-tuned model reaching
+near-perfect accuracy on this specific 270-example held-out set is
+genuine (confirmed above, not a parsing artifact), but it reflects how
+learnable this dataset's structure is, not a guarantee of 100% accuracy
+on messier, non-templated real-world support tickets. The honest
+interpretation: fine-tuning clearly and dramatically closed the gap the
+baseline showed, not that the model is flawless on all inputs.
+
 ## Key decisions and why
 
 | Decision | Why |

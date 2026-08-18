@@ -33,14 +33,21 @@ Azure ML Workspace -> Compute Cluster -> Training Job (QLoRA) -> MLflow tracking
 
 ## Status
 
-In progress. Done so far: Azure ML workspace + compute cluster provisioned,
-dataset loaded/explored/split, zero-shot baseline evaluated (55.6%
-accuracy, macro F1 0.483), and QLoRA training completed on Google Colab
-(Azure GPU quota never landed; local GPU throttled under sustained load —
-see the build log for the full compute-fallback story, including a
-SeaWulf HPC detour that was explored and abandoned). Fine-tuned model
-evaluated locally on the identical 270-example sample for a direct
-before/after comparison.
+In progress. QLoRA training and evaluation are complete:
+
+| Metric | Zero-shot baseline | Fine-tuned |
+|---|---|---|
+| Accuracy | 55.6% | 100% |
+| Macro F1 | 0.483 | 1.000 |
+| Weighted F1 | 0.483 | 1.000 |
+
+(Same 270-example stratified sample for both; see `docs/README.md` for
+the honest caveat on what a perfect score on this specific, templated
+dataset does and doesn't imply.) Training ran on Google Colab, not Azure
+ML compute — Azure GPU quota never landed, local GPU throttled under
+sustained load, and a SeaWulf HPC detour was explored and abandoned; the
+full story is in the build log.
+
 See [`docs/build-log.md`](docs/build-log.md) for the running engineering
 log, including several real mistakes made and caught along the way, and
 [`docs/README.md`](docs/README.md) for the consolidated reference.

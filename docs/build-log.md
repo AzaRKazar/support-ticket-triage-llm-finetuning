@@ -266,3 +266,48 @@ investigation and in case it's worth revisiting later.
 Reverted to the Colab plan from the previous entry: stratified
 10,000-example subset (370/class), 1 epoch, ~2.5 hours, already built in
 `notebooks/colab_train_qlora.ipynb`.
+
+## 2026-08-18 — QLoRA training completed on Colab; fine-tuned eval run locally
+
+Ran the Colab plan: 313 steps, 1 epoch over the 9,990-example stratified
+subset, took 2h22m (in line with the ~2.5hr estimate from measured
+throughput). Training loss dropped smoothly from 0.966 (step 20) to
+0.114 (step 300), no instability. Adapter downloaded and placed at
+`models/qlora-adapter/`.
+
+Colab's free-tier GPU quota was exhausted right after the long run, so
+the fine-tuned evaluation was run locally instead
+(`src/evaluation/finetuned_eval.py`, new) rather than waiting for quota
+to reset -- eval is pure inference (270 short generations), nowhere near
+the sustained load that caused local *training* to throttle earlier, so
+local GPU handled it fine with no thermal issues (finished in ~3.5
+minutes).
+
+**Result**, same 270-example sample and prompt/parsing logic as
+`baseline_eval.py` for a direct comparison:
+
+| Metric | Baseline (zero-shot) | Fine-tuned |
+|---|---|---|
+| Accuracy | 55.6% | 100% |
+| Macro F1 | 0.483 | 1.000 |
+| Weighted F1 | 0.483 | 1.000 |
+| Unparseable rate | 3.3% | 0% |
+
+Perfect accuracy is a real result, not a bug -- verified by hand-checking
+`results/finetuned/predictions.csv`: all five of the baseline's complete
+failure categories (`edit_account`, `get_refund`,
+`set_up_shipping_address`, `switch_account`, `track_refund`) predict
+correctly now, and predictions span all 27 labels rather than
+collapsing. Worth stating honestly, though: the Bitext dataset is
+templated (placeholder slots, heavily repeated phrasing per intent), so
+near-perfect accuracy on this specific held-out set reflects how
+learnable this dataset's structure is under fine-tuning, not a claim
+that the model would hit 100% on messier, non-templated real-world
+tickets.
+
+`README.md` and `docs/README.md` updated to match actual current state
+(both had drifted -- still described the old CPU-only-fallback,
+training-not-yet-run state from well before this whole compute saga).
+
+Next: business-impact writeup, then register the adapter to the Azure
+ML Model Registry.
