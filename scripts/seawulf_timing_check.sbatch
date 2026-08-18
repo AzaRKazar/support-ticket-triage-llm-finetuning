@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J qlora-timing-check
-#SBATCH -p a100
-#SBATCH --gpus=1
+#SBATCH -p v100
+#SBATCH --gres=gpu:1
 #SBATCH -N 1
 #SBATCH -t 00:30:00
 #SBATCH -o slurm-timing-%j.out
@@ -13,12 +13,15 @@
 # the way they did on the local laptop GPU). Same discipline as the
 # local and Colab attempts -- don't commit to a multi-hour job blind.
 #
-# CHECK BEFORE FIRST RUN: `module avail` on SeaWulf to confirm the module
-# names below still match -- pulled from public SeaWulf docs, not
-# verified against a live session.
+# Verified live on SeaWulf 2026-08-18: no `a100` partition exists on this
+# cluster (public docs were wrong). Real GPU partitions are `gpu`/
+# `gpu-long`/`gpu-large` (Tesla K80 -- no tensor cores, likely slower than
+# Colab's T4, avoid) and `v100` (Tesla V100-PCIE-32GB, 24hr limit -- used
+# here). `nvidia-smi -L` via `srun` is what confirmed the actual hardware,
+# not the node/partition names.
 
 module load cuda120/toolkit/12.0
-module load anaconda3 2>/dev/null || true
+module load anaconda/3-new
 
 if [ ! -d ".venv" ]; then
     python -m venv .venv

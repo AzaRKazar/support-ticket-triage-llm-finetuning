@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J qlora-full-train
-#SBATCH -p a100
-#SBATCH --gpus=1
+#SBATCH -p v100
+#SBATCH --gres=gpu:1
 #SBATCH -N 1
 #SBATCH -t 08:00:00
 #SBATCH -o slurm-full-%j.out
@@ -14,13 +14,15 @@
 # change (smaller data, more time, a different queue) rather than just
 # running this blind.
 #
-# 8-hour wall time requested (a100 queue max). If a full 2-epoch run
-# looks like it'll need longer based on the timing check's per-step
-# rate, switch -p to a100-long (up to 48 hours, 1 node) before
-# submitting.
+# Verified live on SeaWulf 2026-08-18: no `a100` partition exists on this
+# cluster. Using `v100` (Tesla V100-PCIE-32GB), whose real ceiling is a
+# 24-hour limit in the same partition -- no separate "-long" queue needed.
+# 8-hour wall time requested here as a starting budget; if the timing
+# check's per-step rate implies the full run needs longer, raise -t (up
+# to 24:00:00) before submitting rather than assuming 8 hours is enough.
 
 module load cuda120/toolkit/12.0
-module load anaconda3 2>/dev/null || true
+module load anaconda/3-new
 
 source .venv/bin/activate
 

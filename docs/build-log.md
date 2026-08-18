@@ -172,3 +172,44 @@ full dataset, burst+cooldown local training is the fallback.
 
 Next: run the notebook on Colab, get a real (not assumed) timing
 measurement, then decide on full-dataset vs. reduced scope based on that.
+
+## 2026-08-18 — Colab notebook scoped down; SeaWulf verified live
+
+Three Colab T4 timing tests came back consistent regardless of batch size
+or gradient checkpointing setting: 1.152, 1.068, 1.119 samples/sec --
+a real ~1.1 samples/sec ceiling, not noise. Full dataset x 2 epochs
+would need ~11 hours, too long for one Colab session. Updated
+`notebooks/colab_train_qlora.ipynb` with a stratified 370/class
+(~10,000 example) subsampling cell and cut the full-run cell to 1 epoch
+over that subset (~2.5 hours), same methodology as the earlier local
+subset script.
+
+In parallel, checked whether SeaWulf (Stony Brook's HPC cluster) could
+beat that instead of just accepting the Colab scope cut, using WinSCP's
+built-in terminal over the existing SSH session rather than assuming
+anything from public docs:
+
+- The public SeaWulf docs the `seawulf_*.sbatch` scripts were originally
+  written against turned out to be wrong on two counts: no `a100`
+  partition exists on this cluster at all, and `module load anaconda3`
+  isn't a real module name (it was silently failing via `|| true`,
+  which would have left the venv built against the system's Python
+  3.6.8 -- far too old for transformers/trl/peft/bitsandbytes).
+- Checked real partitions via `sinfo`: `gpu`/`gpu-long`/`gpu-large`
+  (nodes `sn-nvda[3-8]`) and `v100` (nodes `sn-nvda[1-2]`) are genuinely
+  separate node pools, not the same hardware under different queue
+  policies -- confirmed by requesting `nvidia-smi -L` on each via `srun`
+  rather than guessing from partition/node names. Result: the `gpu`
+  partition is **Tesla K80** (2014-era, no tensor cores -- likely
+  *slower* than Colab's T4, not a real upgrade), while `v100` is
+  **Tesla V100-PCIE-32GB** (real tensor cores, 32GB VRAM, 24hr limit).
+- Fixed both sbatch scripts: `-p a100` -> `-p v100`, `--gpus=1` ->
+  `--gres=gpu:1` (matches the exact flag verified working via `srun`),
+  `module load anaconda3` -> `module load anaconda/3-new` (real module,
+  confirmed via `module avail`, gives Python 3.11.15).
+- Repo cloned onto SeaWulf at `/gpfs/home/mallabaksh/support-ticket-triage-llm-finetuning`.
+
+Next: submit `scripts/seawulf_timing_check.sbatch` on the `v100`
+partition, inspect real step times, and decide between the Colab subset
+plan and a SeaWulf full-dataset run based on actual numbers -- same
+discipline as every other compute decision so far.
