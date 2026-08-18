@@ -1,0 +1,14 @@
+# Subset of requirements.txt actually needed to run src/training/train_qlora.py.
+# Deliberately excludes scikit-learn, scipy, matplotlib, seaborn -- those are
+# only used by the eval/data-prep scripts, and pulling them in here triggers
+# a from-source numpy/scipy build that fails on SeaWulf's old system GCC
+# (4.8.5, needs >=9.3). See docs/build-log.md, 2026-08-18 entry.
+pandas>=2.2
+datasets>=2.19
+transformers>=4.42
+accelerate>=0.30
+tqdm>=4.66
+peft>=0.11
+bitsandbytes>=0.43
+trl>=0.9
+mlflow>=2.14

@@ -23,20 +23,26 @@
 module load cuda120/toolkit/12.0
 module load anaconda/3-new
 
-# --system-site-packages: this node's GCC (4.8.5) is too old to build
-# numpy from source, which pip otherwise attempts because no manylinux
-# wheel matches this RHEL7-era glibc for recent numpy releases. Inheriting
-# anaconda/3-new's precompiled numpy/pandas/scikit-learn sidesteps that
-# build entirely instead of pinning around it.
+# --system-site-packages inherits anaconda/3-new's precompiled numpy/pandas,
+# but pip's build isolation (used when compiling packages from source)
+# ignores it and fetches its own numpy anyway -- so scikit-learn/scipy
+# still tried and failed to build numpy against this node's GCC 4.8.5
+# (needs >=9.3). Fix: install only what train_qlora.py actually imports
+# (requirements-seawulf.txt), skipping scikit-learn/scipy/matplotlib/
+# seaborn entirely since training doesn't need them.
 if [ ! -d ".venv" ]; then
     python -m venv --system-site-packages .venv
 fi
 source .venv/bin/activate
 
 pip install -q --upgrade pip
-pip install -q -r requirements.txt
+pip install -q -r requirements-seawulf.txt
 pip install -q torch --index-url https://download.pytorch.org/whl/cu121
-pip install -q bitsandbytes peft trl
+# Known issue: pip can resolve nvidia-cusparse-cu12/nvidia-nvjitlink-cu12
+# (loose-range sub-deps of the cu121 torch wheel) to a mismatched pair,
+# causing "symbol __nvJitLinkAddData_12_1 ... not defined" on import.
+# Forcing nvjitlink to the latest available version is the documented fix.
+pip install -q --upgrade nvidia-nvjitlink-cu12
 
 echo "=== GPU check ==="
 python -c "import torch; print('CUDA:', torch.cuda.is_available()); print('Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'none')"
