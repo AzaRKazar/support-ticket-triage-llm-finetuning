@@ -121,3 +121,54 @@ Azure's.
 
 Next: run the real training job for Project 2a on the full 22,841
 example training set.
+
+## 2026-08-17 — Local GPU throttling confirmed severe; pivoted to Colab
+
+Fixed a real bug found in the timing test: `trl` 1.10.0 renamed
+`SFTConfig`'s `max_seq_length` to `max_length` -- the script was written
+against an earlier API. Checked the rest of the config's parameter names
+against the installed version's actual signature before re-running,
+rather than fix errors one at a time.
+
+First real timing test (default config, full 22,841-example data): 20
+steps took 12.6 minutes, extrapolating to **~30 hours** for a full 2-epoch
+run -- not viable. Investigated why rather than just picking smaller
+numbers: found the data's actual token length (mean 145, max 157) was
+a fraction of the configured `max_seq_length=512`, so raised batch size
+and cut sequence length to match the real data, backed by a token-length
+check rather than a guess.
+
+That fix made things *worse* on the immediate retest (67-85 sec/step vs.
+the original 19-42 sec/step) -- checked `nvidia-smi` live rather than
+assume the config change was bad, and found the real cause: GPU at 76C,
+clocked at 1080MHz against a 2100MHz max, drawing only 27W. Classic
+thermal/power throttling from two back-to-back tests with no cooldown.
+
+The laptop then powered off unexpectedly mid-test. Restarted, confirmed
+no orphaned processes, and re-tested from a cooler baseline (68C) on a
+smaller 1,620-example stratified subset (`src/data_prep/build_local_subset.py`,
+60/class) specifically to get a clean reading. Same pattern recurred:
+step time climbed steadily within the first 10 steps (39s -> 77s) even
+starting cooler -- this GPU throttles within minutes under any sustained
+load, not after a long warm-up. Steady-state rate settled around
+~10 sec/sample both times, consistent enough to trust as the real number:
+even the "safe" 1,620-example subset would need 4+ hours at that rate,
+not the 15-20 minutes originally estimated from the optimistic early-step
+numbers.
+
+This is a genuine hardware limitation (6GB laptop GPU, WDDM driver
+overhead, thermal design not built for sustained ML workloads), not a
+config problem to keep tuning around. Three options were on the table:
+a much smaller (~120-150 example) subset for one short session, burst
+training with cooldown pauses using checkpointing, or moving training to
+Google Colab. Chose Colab first, since the brief already sanctioned it as
+a fallback and Colab's T4 has proper server cooling with no local
+thermal ceiling -- built `notebooks/colab_train_qlora.ipynb`, which
+rebuilds the identical train/test split (same dataset, same
+`random_state=42`) rather than requiring a manual data upload, and
+includes its own bounded timing check before committing to a full run,
+same discipline as the local attempts. If Colab also can't sustain the
+full dataset, burst+cooldown local training is the fallback.
+
+Next: run the notebook on Colab, get a real (not assumed) timing
+measurement, then decide on full-dataset vs. reduced scope based on that.

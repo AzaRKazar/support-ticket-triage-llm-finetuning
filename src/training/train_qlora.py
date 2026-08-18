@@ -32,6 +32,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lora-alpha", type=int, default=32)
     p.add_argument("--lora-dropout", type=float, default=0.05)
     p.add_argument("--max-seq-length", type=int, default=512)
+    p.add_argument("--max-steps", type=int, default=-1, help="Bounded run for timing tests; -1 = full run")
+    p.add_argument("--report-to", default="mlflow", help="Set to 'none' for quick local timing tests")
     return p.parse_args()
 
 
@@ -96,9 +98,10 @@ def main() -> None:
         logging_steps=20,
         save_strategy="epoch",
         bf16=True,
-        max_seq_length=args.max_seq_length,
+        max_length=args.max_seq_length,
         dataset_text_field="text",
-        report_to="mlflow",
+        report_to=args.report_to,
+        max_steps=args.max_steps,
     )
 
     trainer = SFTTrainer(
