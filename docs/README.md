@@ -48,15 +48,20 @@ re-downloads from Hugging Face and re-splits deterministically).
 | Budget alert | $35/month, 80% actual-spend threshold |
 | MLflow tracking | Native to the workspace, no separate setup |
 
-**Why CPU compute, not GPU:** the brief's plan called for an
-NCasT4_v3-family GPU cluster for QLoRA training. Actual quota (checked via
-`az vm list-usage` across all 31 regions offering that SKU) came back 0
-everywhere — the support ticket confirming "VM series correct" was not
-confirmation of an approved grant. Rather than block on that ticket, the
-pipeline is being built end-to-end on CPU compute now (workspace,
-tracking, registry, endpoint), with the GPU-dependent training step ready
-to run the moment quota lands. See `build-log.md` for the full quota-check
-detail.
+**Why the actual training didn't run on Azure ML compute:** the brief's
+plan called for an NCasT4_v3-family GPU cluster for QLoRA training.
+Actual quota (checked via `az vm list-usage` across all 31 regions
+offering that SKU) came back 0 everywhere — a formal support ticket was
+filed and is still pending Azure's turnaround. Rather than block on that,
+training moved through a documented sequence of fallbacks instead: local
+GPU (viable in principle, but hit reproducible thermal throttling under
+sustained load — see `build-log.md`), then Google Colab (where training
+actually ran to completion), with a SeaWulf HPC detour explored and
+abandoned along the way (real V100 GPUs, but an environment too old to
+be worth fighting for a portfolio project). The rest of the pipeline —
+workspace, tracking, registry, endpoint — is still built on Azure ML;
+only the compute-heavy training step ran elsewhere, with the resulting
+adapter brought back to Azure ML's Model Registry afterward.
 
 ## Training approach
 
@@ -79,11 +84,18 @@ is trained to answer with just the label.
 params/metrics/the adapter log to the workspace's MLflow tracking with no
 extra wiring required.
 
-**Status:** script written (`src/training/train_qlora.py`), **not yet
-executed anywhere**. 4-bit quantization requires CUDA, so this can't be
-smoke-tested on the local CPU machine — it's built to standard,
-well-established QLoRA patterns, but unverified until real GPU compute is
-available.
+**Status:** complete. Trained on Google Colab's free-tier T4 GPU (`notebooks/colab_train_qlora.ipynb`),
+on a stratified 370-examples-per-class subset (9,990 total, ~44% of the
+full 22,841-example training set) for 1 epoch — a deliberate scope
+reduction from the original full-dataset/2-epoch plan, based on measured
+Colab throughput (~1.1 samples/sec, confirmed consistent across three
+separate timing tests) that made the full run's ~11-hour estimate
+impractical for one Colab session. Training took 2h22m across 313 steps;
+training loss dropped from 0.966 (step 20) to 0.114 (step 300) with
+smooth, stable convergence. Adapter downloaded and stored locally at
+`models/qlora-adapter/` (gitignored — see `build-log.md` for the full
+compute-fallback story: local GPU throttling, the Colab pivot, and a
+SeaWulf detour that was explored and abandoned).
 
 ## Evaluation approach
 
@@ -127,9 +139,15 @@ collapses into a semantically adjacent category rather than random noise
 100% of the time; `track_refund` as `check_refund_policy` 100% of the
 time). The base model follows the output-format instruction fine but
 can't separate this dataset's fine-grained category boundaries — the
-gap fine-tuning is meant to close. Same evaluation will be re-run against
-the fine-tuned model on the identical 270-example sample once GPU compute
-is available.
+gap fine-tuning is meant to close.
+
+**Fine-tuned model:** evaluated on the identical 270-example sample
+(same rows, same prompt format, same parsing logic) with the trained
+QLoRA adapter applied, so this is a direct apples-to-apples comparison
+against the baseline above. Run locally on GPU (`src/evaluation/finetuned_eval.py`)
+rather than Colab, since this is pure inference — a few hundred short
+generations — nowhere near the sustained load that caused local
+*training* to throttle. Full results in `results/finetuned/`.
 
 ## Key decisions and why
 
@@ -137,9 +155,13 @@ is available.
 |---|---|
 | CPU-only fallback instead of waiting on GPU quota | Ticket confirmation ≠ granted quota; verified 0 across all eligible regions. Fallback path keeps the rest of the pipeline (workspace, tracking, registry, endpoint) moving. |
 | eastus region | Brief's suggested default; not GPU-quota-driven since no region has quota yet. Revisit if/when quota lands elsewhere. |
-| Stratified 270-example eval sample | CPU-only inference is too slow for full-test-set iteration (~20 sec/example). Documented explicitly rather than presented as the full set. |
+| Stratified 270-example eval sample | CPU-only inference is too slow for full-test-set iteration (~20 sec/example). Documented explicitly rather than presented as the full set. Same sample reused for the fine-tuned model. |
 | Same base model for baseline and fine-tune | Required for the before/after comparison to isolate the effect of fine-tuning rather than model choice. |
 | Compute Cluster, not Compute Instance | Instances are always-on single VMs with no autoscale-to-zero; caught and corrected after an instance was accidentally left running. See `build-log.md`. |
+| Training moved off Azure ML compute (local GPU, then Colab) | GPU quota never landed; local GPU throttled under sustained load (confirmed 3x via `nvidia-smi`); Colab (the brief's own sanctioned fallback) had proper cooling and gave consistent, usable throughput. |
+| 10,000-example subset, 1 epoch (not full 22,841 x 2 epochs) | Measured Colab throughput (~1.1 samples/sec, consistent across 3 tests) made the full run ~11 hours — too long for one Colab session. Loss curve during testing converged fast, suggesting the full dataset wasn't needed to show a real improvement. |
+| SeaWulf explored, then abandoned | Real V100 GPUs confirmed live, but the node's RHEL7-era toolchain (GCC 4.8.5) made getting a working ML environment impractical relative to the time saved over Colab. |
+| Fine-tuned eval run locally, not Colab | Colab's free-tier GPU quota was exhausted after the long training run. Eval is pure inference (a few hundred short generations) — nowhere near the sustained load that caused local training to throttle, so local GPU handles it fine. |
 
 ## Reproduce
 
