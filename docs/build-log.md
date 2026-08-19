@@ -311,3 +311,57 @@ training-not-yet-run state from well before this whole compute saga).
 
 Next: business-impact writeup, then register the adapter to the Azure
 ML Model Registry.
+
+## 2026-08-18 — Real data leakage found and fixed: dataset needed dedup before splitting
+
+Before moving to the business-impact writeup, ran an interactive
+qualitative test (`src/inference/classify_live.py`, new) -- typing
+genuinely novel, non-templated messages at the fine-tuned model rather
+than trusting the templated test set alone. Results were mixed in an
+informative way: correct handling of negation and mid-sentence intent
+pivots (e.g. "I don't want a refund, I just want to know where my
+package is" -> `track_order`), but three clearly out-of-scope inputs
+("what's the weather today", "write me a python function...") all got
+confidently forced into a real (wrong) label instead of any "doesn't
+apply" signal -- a genuine deployment-relevant limitation, not a dataset
+artifact.
+
+Separately, pushed back on the 100% accuracy / 1.000 macro F1 result
+itself as implausible on its face -- correctly so. Investigated rather
+than defended it:
+
+- Checked for exact-text overlap between train and test: **405 of 4,031
+  test rows (10%) had `instruction` text byte-identical to a training
+  row.** Root cause: the dataset's `{{Placeholder}}` tokens are literal,
+  unfilled strings, not substituted values, so many rows across the full
+  26,872-row dataset are exact duplicates of each other (2,237 of them,
+  confirmed always mapping to the same intent). `train_test_split` only
+  guarantees disjoint *rows*, not disjoint *text* -- duplicate content
+  leaks across the split regardless of a correct split implementation.
+- Quantified impact on the actual 270-example eval sample specifically:
+  **31/270 rows (11.5%) had exact-duplicate text in the training set.**
+  This is real leakage and a real methodological flaw, but it doesn't
+  fully explain the 100% result -- since overall accuracy was exactly
+  270/270, the other 239 non-leaked rows were *also* all predicted
+  correctly, meaning genuine fine-tuning-driven generalization accounts
+  for the large majority of the result, not memorization of exact text.
+
+Fixed at the source rather than just filtering the eval sample:
+`src/data_prep/load_bitext.py` now deduplicates by `instruction` text
+(keep first occurrence) before the stratified split. Confirmed zero
+inconsistent labels among duplicates (safe to dedupe naively) and
+healthy class balance afterward (24,635 unique rows, smallest class 493
+examples). Regenerated the local split: 20,939 train / 3,696 test, zero
+exact-text overlap confirmed. Applied the identical dedup step to
+`notebooks/colab_train_qlora.ipynb`'s data-load cell so Colab's
+independently-reloaded split matches exactly.
+
+This requires a real redo, not just a note: baseline eval, training, and
+fine-tuned eval were all computed on the old (leaky) split's specific
+rows, so none of the existing numbers in `results/baseline/` or
+`results/finetuned/` are valid against the new split's actual held-out
+set. Sequence: (1) re-run `baseline_eval.py` on the new split [running
+now, ~1.5hr on CPU], (2) retrain on Colab with the new clean subset
+[~2.5hr], (3) re-run `finetuned_eval.py` locally on the new 270-example
+sample. Old results left in place until superseded rather than deleted,
+so the discovery is traceable.

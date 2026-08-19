@@ -34,6 +34,17 @@ def explore(df: pd.DataFrame) -> None:
 def split_and_save(df: pd.DataFrame) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+    # The Bitext dataset's {{Placeholder}} tokens are literal, unfilled
+    # strings, not substituted values -- so many rows share byte-identical
+    # `instruction` text (2,237 of 26,872, confirmed always mapping to the
+    # same intent). train_test_split only guarantees disjoint rows, not
+    # disjoint text, so duplicate text leaks across the split regardless.
+    # Deduplicating first (24,635 unique rows remain, class balance still
+    # healthy -- smallest class 493 examples) closes that gap.
+    before = len(df)
+    df = df.drop_duplicates(subset="instruction", keep="first").reset_index(drop=True)
+    print(f"\nDeduplicated by instruction text: {before} -> {len(df)} rows")
+
     train_df, test_df = train_test_split(
         df, test_size=0.15, random_state=42, stratify=df["intent"]
     )
