@@ -125,10 +125,16 @@ predictions.csv, confusion_matrix.png).
 
 | Metric | Value |
 |---|---|
-| Accuracy | 55.6% |
-| Macro F1 | 0.483 |
-| Weighted F1 | 0.483 |
-| Unparseable output rate | 3.3% |
+| Accuracy | 58.9% |
+| Macro F1 | 0.538 |
+| Weighted F1 | 0.538 |
+| Unparseable output rate | 4.1% |
+
+(Re-run 2026-08-18 on a deduplicated split -- an earlier version had
+405/4,031 test rows with exact-duplicate `instruction` text also in
+train, since the dataset's `{{Placeholder}}` tokens are literal unfilled
+strings rather than substituted values. See `build-log.md` for the full
+investigation.)
 
 Strongest categories (F1 ~0.95): `check_cancellation_fee`,
 `payment_issue`, `recover_password`. Complete failures (F1 = 0.0):
@@ -149,33 +155,28 @@ rather than Colab, since this is pure inference — a few hundred short
 generations — nowhere near the sustained load that caused local
 *training* to throttle. Full results in `results/finetuned/`.
 
-**Status:** complete.
+**Status:** the 100%/1.000 numbers reported earlier were computed on a
+split later found to have real train/test text leakage (see
+`build-log.md`, 2026-08-18) — 31/270 eval rows had exact-duplicate
+`instruction` text in the training set, because the dataset's
+`{{Placeholder}}` tokens are literal unfilled strings rather than
+substituted values. That leakage was quantified (31/270, ~11.5%) and
+didn't fully explain the perfect score — the other 239 non-leaked rows
+were also all correct — but the dataset has been deduplicated at the
+source and everything is being redone on the clean split: baseline
+re-run already complete (58.9% accuracy, 0.538 macro F1), training and
+fine-tuned eval pending a Colab re-run.
 
-| Metric | Zero-shot baseline | Fine-tuned |
-|---|---|---|
-| Accuracy | 55.6% | 100% |
-| Macro F1 | 0.483 | 1.000 |
-| Weighted F1 | 0.483 | 1.000 |
-| Unparseable output rate | 3.3% | 0% |
-
-All five of the baseline's complete-failure categories (`edit_account`,
-`get_refund`, `set_up_shipping_address`, `switch_account`,
-`track_refund` — F1 0.0 zero-shot, each systematically collapsing into a
-semantically adjacent category) predict perfectly after fine-tuning, and
-predictions span the full 27-label space rather than collapsing —
-verified by inspecting `results/finetuned/predictions.csv` directly
-rather than trusting the aggregate metric alone.
-
-**Caveat worth stating plainly:** the Bitext dataset is templated/
-synthetic (placeholder slots like `{{Order Number}}`, heavily repeated
-phrasing patterns per intent — e.g. "cancel purchase X" / "help me
-canceling purchase X" for the same label). A fine-tuned model reaching
-near-perfect accuracy on this specific 270-example held-out set is
-genuine (confirmed above, not a parsing artifact), but it reflects how
-learnable this dataset's structure is, not a guarantee of 100% accuracy
-on messier, non-templated real-world support tickets. The honest
-interpretation: fine-tuning clearly and dramatically closed the gap the
-baseline showed, not that the model is flawless on all inputs.
+**Live qualitative testing (`src/inference/classify_live.py`):** on the
+original (leaky-split) adapter, handled negation and mid-message intent
+pivots correctly, but had no ability to reject genuinely out-of-scope
+input — three unrelated messages ("what's the weather today", "write me
+a python function...") all got confidently forced into a real, wrong
+label rather than any "doesn't apply" signal. Worth re-testing once the
+clean-split adapter is trained, and worth keeping as a stated limitation
+in the business-impact writeup either way — a deployed version needs a
+confidence threshold or explicit fallback, not blind trust in the
+27-label output.
 
 ## Key decisions and why
 
