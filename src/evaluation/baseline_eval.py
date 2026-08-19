@@ -63,7 +63,9 @@ def run() -> None:
 
     print(f"Loading {MODEL_NAME} ...")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=torch.bfloat16)
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME, dtype=torch.bfloat16, device_map="auto"
+    )
     model.eval()
 
     sample = load_eval_sample()
@@ -73,7 +75,7 @@ def run() -> None:
     predictions = []
     for _, row in tqdm(sample.iterrows(), total=len(sample)):
         prompt = build_prompt(tokenizer, labels, row["instruction"])
-        inputs = tokenizer(prompt, return_tensors="pt")
+        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         with torch.no_grad():
             out = model.generate(
                 **inputs,
