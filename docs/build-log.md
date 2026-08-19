@@ -360,8 +360,32 @@ This requires a real redo, not just a note: baseline eval, training, and
 fine-tuned eval were all computed on the old (leaky) split's specific
 rows, so none of the existing numbers in `results/baseline/` or
 `results/finetuned/` are valid against the new split's actual held-out
-set. Sequence: (1) re-run `baseline_eval.py` on the new split [running
-now, ~1.5hr on CPU], (2) retrain on Colab with the new clean subset
-[~2.5hr], (3) re-run `finetuned_eval.py` locally on the new 270-example
-sample. Old results left in place until superseded rather than deleted,
-so the discovery is traceable.
+set. Sequence: (1) re-run `baseline_eval.py` on the new split, (2)
+retrain on Colab with the new clean subset, (3) re-run
+`finetuned_eval.py` locally on the new 270-example sample.
+
+Step 1 also turned up a second, unrelated bug while re-running:
+`baseline_eval.py` never actually put the model on GPU (no `device_map`
+or `.to()` in its load call), so it silently ran on CPU the whole time
+despite the local `.venv` having working CUDA -- explains why it always
+took ~1.5hr instead of the few minutes `finetuned_eval.py` needed for
+the same 270 examples. Fixed (`device_map="auto"`, moved inputs to
+`model.device`). First GPU re-run crashed with a segfault (exit 139);
+root cause was a leftover `classify_live.py` interactive session from
+earlier still holding the model in GPU memory, fighting the new process
+for CUDA context on the 6GB card. Killed the stray process, GPU memory
+confirmed clear, re-ran cleanly in 2m16s.
+
+**New baseline (deduplicated split):**
+
+| Metric | Old (leaky) | New (clean) |
+|---|---|---|
+| Accuracy | 55.6% | 58.9% |
+| Macro F1 | 0.483 | 0.538 |
+| Weighted F1 | 0.483 | 0.538 |
+| Unparseable rate | 3.3% | 4.1% |
+
+Small shift, as expected from different specific rows landing in the new
+270-example sample -- nothing alarming. Next: retrain on Colab with the
+deduplicated subset, then re-run the fine-tuned eval for the real,
+leak-free before/after comparison.
