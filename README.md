@@ -57,6 +57,14 @@ compute (see Status above), but the resulting artifact lives in the
 same registry a fully-in-Azure pipeline would use, closing the loop back
 to the original architecture.
 
+The full pipeline was also proven end-to-end with a real managed online
+endpoint deployment (`deployment/`, CPU-based since GPU quota never
+landed) — deployed, tested live (correct predictions, plus the same
+out-of-scope weak spot found earlier), then torn down immediately since
+it was a POC, not something meant to run continuously. See
+`docs/build-log.md`, 2026-08-20, for the two real quota/config issues
+hit and fixed along the way.
+
 See [`docs/build-log.md`](docs/build-log.md) for the running engineering
 log, including several real mistakes made and caught along the way, and
 [`docs/README.md`](docs/README.md) for the consolidated reference.

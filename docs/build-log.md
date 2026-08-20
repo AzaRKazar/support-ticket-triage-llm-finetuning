@@ -473,3 +473,64 @@ itself was never used for the actual training (GPU quota never landed;
 Colab did the real work instead), but the full pipeline architecture --
 workspace, tracking-ready setup, registry -- is real and the trained
 artifact now lives where the original design intended.
+
+## 2026-08-20 — Managed online endpoint deployed as a POC, then torn down
+
+Deployed the registered adapter behind a real Azure ML managed online
+endpoint to close out the pipeline architecture end-to-end, explicitly
+as a POC: deploy, verify it answers correctly, capture evidence, tear
+down -- not meant to run continuously (unlike the training compute
+cluster, online endpoints don't scale to zero, so idle time is pure
+cost).
+
+Since the model was registered as `custom_model` (trained on Colab, not
+an Azure ML job, so no MLflow format), Azure ML can't auto-generate a
+scorer -- wrote `deployment/score.py` by hand (`init()`/`run()`), plus a
+conda environment and endpoint/deployment YAML (`deployment/`). CPU-only
+deployment: same GPU quota wall the training investigation already
+found applies here too, and bitsandbytes' 4-bit quantization requires
+CUDA anyway, so `score.py` loads the base model in bf16 with the LoRA
+adapter applied on top instead. Intent labels hardcoded in the script
+since they weren't shipped as a separate artifact with the registered
+model.
+
+Hit two real, sequential problems getting it live, both diagnosed
+rather than guessed around:
+
+1. First `az ml online-endpoint create` failed: `Microsoft.PolicyInsights`
+   resource provider wasn't registered on the subscription (a one-time
+   setup gap specific to managed online endpoints, unrelated to our
+   config). Registered it, waited for propagation, retried -- endpoint
+   created, but a stray `Failed`-state resource was left behind from the
+   first attempt and had to be deleted before recreating cleanly.
+2. Deployment then failed with `OutOfQuota`: 8 vCPUs requested (managed
+   online endpoints reserve 2x the instance size for safe rollout, so
+   `Standard_DS3_v2`'s 4 vCPUs x 2) against quota reported as `[N/A]`.
+   Checked general subscription VM quota first (`az vm list-usage`) --
+   showed healthy headroom, a red herring. The real constraint is a
+   *separate*, online-endpoint-specific quota pool
+   (`az ml compute list-usage` shows the AML compute-cluster quota, which
+   is also a different pool again -- three separate quota systems in
+   play). Dropped to `Standard_DS2_v2` (2 vCPUs, so 4 requested instead
+   of 8) as a diagnostic rather than immediately filing another support
+   ticket -- it worked, confirming the smaller size fit under whatever
+   thin allowance exists rather than the pool being hard-zero like the
+   GPU quota was.
+
+Live-tested via `az ml online-endpoint invoke` -- first call timed out
+(the default 5-second request timeout is too short for CPU generation
+on a small 2-vCPU instance), fixed by setting `request_timeout_ms: 90000`
+in `deployment.yml` and updating the deployment. Second call succeeded:
+correct `track_order` prediction. User then tested interactively via
+Studio's Test tab with several messages, including the known
+out-of-scope weak spot ("what's the weather today" -> `"none"`,
+"asdfghjkl ??? order thing idk" -> `place_order`) -- both matched
+`classify_live.py`'s local results exactly, a good consistency signal
+between the 4-bit-quantized local path and the unquantized bf16 CPU
+serving path, despite being numerically different inference stacks.
+
+Torn down immediately after verification: `az ml online-endpoint delete`,
+confirmed gone via a follow-up `show` call rather than trusting the exit
+code alone. Deployment files (`deployment/`) stay in the repo as a real,
+working, reproducible artifact of the architecture, even though nothing
+is left running.
