@@ -51,10 +51,15 @@ GPU quota never landed, local GPU throttled under sustained load, and a
 SeaWulf HPC detour was explored and abandoned; the full story is in the
 build log.
 
+The trained adapter is registered in the Azure ML Model Registry
+(`support-ticket-triage-qlora-adapter`, v1) — trained outside Azure ML
+compute (see Status above), but the resulting artifact lives in the
+same registry a fully-in-Azure pipeline would use, closing the loop back
+to the original architecture.
+
 See [`docs/build-log.md`](docs/build-log.md) for the running engineering
 log, including several real mistakes made and caught along the way, and
 [`docs/README.md`](docs/README.md) for the consolidated reference.
-Model Registry registration is next.
 
 ## Business impact
 

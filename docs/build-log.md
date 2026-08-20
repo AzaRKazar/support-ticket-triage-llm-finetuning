@@ -448,3 +448,28 @@ updated to reflect the more precise (re-tested) finding rather than
 left as a stale note from the superseded adapter.
 
 Next: register the adapter to the Azure ML Model Registry.
+
+## 2026-08-20 — Adapter registered to Azure ML Model Registry
+
+Cleaned up `models/qlora-adapter/` before uploading: it included a
+`checkpoint-313/` subfolder (117MB of 164MB total) that's pure
+training-resume state (optimizer, scheduler, rng) -- fully redundant
+with the root-level files, which are the actual final exported adapter
+(`trainer.save_model()` + `tokenizer.save_pretrained()` output: config,
+weights, tokenizer). Deleted it, dropping the folder to 47MB.
+
+Registered via Azure ML Studio (Models -> Register -> From local files
+-> Custom model), named `support-ticket-triage-qlora-adapter`, with the
+headline metric in the description. Verified via CLI rather than
+trusting the Studio confirmation screen alone: `az ml model show`
+confirms `type: custom_model`, version 1, and a real blob storage path
+under the workspace's datastore -- the files actually uploaded, not
+just an empty registration record.
+
+This closes out Project 2a's core work: data pipeline, baseline,
+training (with a real leakage bug caught and fixed along the way),
+evaluation, business-impact writeup, and registry. Azure ML compute
+itself was never used for the actual training (GPU quota never landed;
+Colab did the real work instead), but the full pipeline architecture --
+workspace, tracking-ready setup, registry -- is real and the trained
+artifact now lives where the original design intended.
