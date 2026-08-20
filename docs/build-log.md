@@ -424,3 +424,27 @@ entries. This closes out Project 2a's core training and evaluation work.
 
 Next: business-impact writeup, then register the adapter to the Azure
 ML Model Registry.
+
+## 2026-08-20 — Business-impact writeup; re-ran live qualitative test on the clean adapter
+
+Added a Business Impact section to `README.md`: what the accuracy jump
+means in practice (58.9% needs checking -> 99.6% trustworthy for the
+common case), the realistic deployment pattern (auto-route, skip manual
+triage for the large majority), and explicit caveats (270-example
+sample, not real production ticket text; the out-of-scope-handling gap
+below).
+
+Before finalizing that gap as a stated limitation, re-ran
+`classify_live.py` against the new clean-split adapter with the exact
+same 12 messages used on the old adapter, for a fair comparison. Result:
+negation handling and mid-message pivots still correct on both. Out-of-
+scope handling changed shape but not substance -- the old adapter forced
+all 3 unrelated messages into a real wrong label every time; the new
+adapter forced 1 of 3 into a real wrong label but produced non-label
+strings (`sort_list`, `none`) for the other 2, inconsistent even between
+two near-identical weather questions. Neither adapter has a dependable
+"doesn't apply" signal, so the limitation stands in the writeup,
+updated to reflect the more precise (re-tested) finding rather than
+left as a stale note from the superseded adapter.
+
+Next: register the adapter to the Azure ML Model Registry.

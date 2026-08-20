@@ -83,12 +83,17 @@ freed up for actually resolving issues instead of sorting them.
   It is not a measurement on this company's or any real production
   ticket stream, which will include phrasing, slang, and edge cases this
   dataset doesn't represent.
-- Interactive testing (`src/inference/classify_live.py`) found the model
-  has **no ability to recognize input that doesn't belong to any of the
-  27 categories** — genuinely unrelated messages get confidently forced
-  into a real (wrong) label rather than flagged. A production deployment
-  needs a confidence threshold or an explicit "route to human" fallback
-  layer on top of this model, not a bare `argmax` over its output.
+- Interactive testing (`src/inference/classify_live.py`) confirms the
+  model still has **no reliable way to recognize input that doesn't
+  belong to any of the 27 categories.** Re-tested on the final adapter:
+  genuinely unrelated messages ("what's the weather today", "write me a
+  python function...") sometimes still get forced into a real, wrong
+  label, and sometimes produce a non-label string instead (`sort_list`,
+  `none`) — inconsistent even between two near-identical off-topic
+  questions. Neither behavior is a dependable "doesn't apply" signal. A
+  production deployment needs a confidence threshold or an explicit
+  "route to human" fallback layer on top of this model, not a bare
+  `argmax` over its output.
 - The one miss in the clean eval sample was a legitimately ambiguous
   message a human could plausibly also misroute — a reminder that even
   a near-perfect router won't hit 100% on real, messy input, and the

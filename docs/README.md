@@ -168,14 +168,18 @@ boundary case: *"error opening user profile"* — true label
 `registration_problems`, predicted `edit_account`. Both are reasonable
 readings of an ambiguous message, not a model malfunction.
 
-**Live qualitative testing (`src/inference/classify_live.py`):** on the
-(now-superseded, leaky-split) adapter, handled negation and mid-message
-intent pivots correctly, but had no ability to reject genuinely
-out-of-scope input — three unrelated messages ("what's the weather
-today", "write me a python function...") all got confidently forced
-into a real, wrong label rather than any "doesn't apply" signal. Not
-yet re-tested on the clean-split adapter, but worth keeping as a stated
-limitation in the business-impact writeup regardless — a deployed
+**Live qualitative testing (`src/inference/classify_live.py`):** run
+against both adapters, 12 identical messages each time for a fair
+comparison. Negation handling and mid-message intent pivots work
+correctly on both. Out-of-scope handling changed shape but not
+substance: the leaky-split adapter forced all three unrelated messages
+("what's the weather today", "write me a python function...",
+"what's the weather looking like tomorrow") into a real, wrong label
+every time; the clean-split adapter forced a wrong real label on one
+of the three, but produced non-label strings (`sort_list`, `none`)
+instead of a real category on the other two — inconsistent even
+between the two near-identical weather questions. Neither adapter has
+a dependable "doesn't apply" signal — the finding stands: a deployed
 version needs a confidence threshold or explicit fallback, not blind
 trust in the 27-label output.
 
