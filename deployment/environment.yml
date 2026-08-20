@@ -1,0 +1,5 @@
+$schema: https://azuremlschemas.azureedge.net/latest/environment.schema.json
+name: qlora-serve-env
+image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+conda_file: conda.yml
+description: CPU serving environment for the QLoRA ticket-triage adapter (no bitsandbytes -- 4-bit requires CUDA, this endpoint runs on CPU since GPU quota never landed).

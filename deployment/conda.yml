@@ -1,0 +1,12 @@
+name: qlora-serve-env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - azureml-inference-server-http
+      - torch==2.5.1
+      - transformers>=4.42
+      - peft>=0.11
+      - accelerate>=0.30

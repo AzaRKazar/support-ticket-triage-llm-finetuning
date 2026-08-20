@@ -1,0 +1,4 @@
+$schema: https://azuremlschemas.azureedge.net/latest/managedOnlineEndpoint.schema.json
+name: ticket-triage-poc
+auth_mode: key
+description: POC endpoint for the QLoRA support-ticket triage adapter. Deploy, verify, tear down -- not meant to run continuously.

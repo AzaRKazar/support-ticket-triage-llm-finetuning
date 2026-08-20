@@ -1,0 +1,10 @@
+$schema: https://azuremlschemas.azureedge.net/latest/managedOnlineDeployment.schema.json
+name: qlora-deployment
+endpoint_name: ticket-triage-poc
+model: azureml:support-ticket-triage-qlora-adapter:1
+code_configuration:
+  code: .
+  scoring_script: score.py
+environment: azureml:qlora-serve-env@latest
+instance_type: Standard_DS3_v2
+instance_count: 1
