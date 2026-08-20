@@ -85,17 +85,19 @@ params/metrics/the adapter log to the workspace's MLflow tracking with no
 extra wiring required.
 
 **Status:** complete. Trained on Google Colab's free-tier T4 GPU (`notebooks/colab_train_qlora.ipynb`),
-on a stratified 370-examples-per-class subset (9,990 total, ~44% of the
-full 22,841-example training set) for 1 epoch — a deliberate scope
-reduction from the original full-dataset/2-epoch plan, based on measured
-Colab throughput (~1.1 samples/sec, confirmed consistent across three
-separate timing tests) that made the full run's ~11-hour estimate
-impractical for one Colab session. Training took 2h22m across 313 steps;
-training loss dropped from 0.966 (step 20) to 0.114 (step 300) with
-smooth, stable convergence. Adapter downloaded and stored locally at
-`models/qlora-adapter/` (gitignored — see `build-log.md` for the full
-compute-fallback story: local GPU throttling, the Colab pivot, and a
-SeaWulf detour that was explored and abandoned).
+on a stratified 370-examples-per-class subset (9,990 total) for 1 epoch —
+a deliberate scope reduction from the original full-dataset/2-epoch
+plan, based on measured Colab throughput (~1.1 samples/sec, confirmed
+consistent across three separate timing tests) that made the full run's
+~11-hour estimate impractical for one Colab session. Trained twice: an
+initial run, then a full retrain (same notebook, same hyperparameters,
+~2h20m, 313 steps, loss 0.968 → 0.117) after a real data-leakage bug was
+found and fixed at the source (dataset deduplicated by `instruction`
+text before splitting — see `build-log.md`, 2026-08-18). Adapter
+downloaded and stored locally at `models/qlora-adapter/` (gitignored —
+see `build-log.md` for the full compute-fallback story: local GPU
+throttling, the Colab pivot, and a SeaWulf detour that was explored and
+abandoned).
 
 ## Evaluation approach
 
@@ -106,13 +108,13 @@ matched against the valid label set (exact match, then substring match,
 then marked unparseable) to get a predicted intent.
 
 **Sampling:** evaluated on a **stratified sample of 270 examples** (10
-per class) from the 4,031-example test set, not the full set. This
-machine is CPU-only with no native bf16 acceleration, and full-set
-inference was projected at many hours; the 270-example sample itself
-takes roughly 1.5 hours. This is a deliberate, documented tradeoff, not a
-hidden shortcut — the same 270-example sample will be reused for the
+per class) from the 3,696-example test set (post-dedup), not the full
+set — full-set inference at this rate would still take a while, and 270
+is enough to see real signal. Runs on local GPU (`device_map="auto"`,
+fixed 2026-08-18 — it silently ran on CPU for a while before that,
+~1.5hr instead of ~2min). Same 270-example sample reused for the
 fine-tuned model's evaluation so the before/after comparison stays
-apples-to-apples, even though it's a sample rather than the full test set.
+apples-to-apples.
 
 **Metrics:** accuracy, macro F1, weighted F1, per-class precision/recall/F1
 (`sklearn.metrics.classification_report`), and a full confusion matrix.
@@ -136,47 +138,46 @@ train, since the dataset's `{{Placeholder}}` tokens are literal unfilled
 strings rather than substituted values. See `build-log.md` for the full
 investigation.)
 
-Strongest categories (F1 ~0.95): `check_cancellation_fee`,
-`payment_issue`, `recover_password`. Complete failures (F1 = 0.0):
-`edit_account`, `get_refund`, `set_up_shipping_address`,
-`switch_account`, `track_refund` — all five turned out to be systematic
-collapses into a semantically adjacent category rather than random noise
-(e.g. `set_up_shipping_address` was predicted as `change_shipping_address`
-100% of the time; `track_refund` as `check_refund_policy` 100% of the
-time). The base model follows the output-format instruction fine but
-can't separate this dataset's fine-grained category boundaries — the
-gap fine-tuning is meant to close.
+Strongest category: `payment_issue` (F1 1.000). Complete failures
+(F1 = 0.0): `edit_account`, `get_invoice`, `get_refund`,
+`set_up_shipping_address` — the base model follows the output-format
+instruction fine but can't separate this dataset's fine-grained category
+boundaries, exactly the gap fine-tuning is meant to close.
 
 **Fine-tuned model:** evaluated on the identical 270-example sample
 (same rows, same prompt format, same parsing logic) with the trained
-QLoRA adapter applied, so this is a direct apples-to-apples comparison
-against the baseline above. Run locally on GPU (`src/evaluation/finetuned_eval.py`)
-rather than Colab, since this is pure inference — a few hundred short
-generations — nowhere near the sustained load that caused local
-*training* to throttle. Full results in `results/finetuned/`.
+QLoRA adapter applied — direct apples-to-apples comparison against the
+baseline above. Trained and evaluated on the deduplicated split (see
+`build-log.md`, 2026-08-18 entries, for the full leakage investigation
+that led here). Full results in `results/finetuned/`.
 
-**Status:** the 100%/1.000 numbers reported earlier were computed on a
-split later found to have real train/test text leakage (see
-`build-log.md`, 2026-08-18) — 31/270 eval rows had exact-duplicate
-`instruction` text in the training set, because the dataset's
-`{{Placeholder}}` tokens are literal unfilled strings rather than
-substituted values. That leakage was quantified (31/270, ~11.5%) and
-didn't fully explain the perfect score — the other 239 non-leaked rows
-were also all correct — but the dataset has been deduplicated at the
-source and everything is being redone on the clean split: baseline
-re-run already complete (58.9% accuracy, 0.538 macro F1), training and
-fine-tuned eval pending a Colab re-run.
+**Status:** complete.
+
+| Metric | Zero-shot baseline | Fine-tuned |
+|---|---|---|
+| Accuracy | 58.9% | 99.6% (269/270) |
+| Macro F1 | 0.538 | 0.996 |
+| Weighted F1 | 0.538 | 0.996 |
+| Unparseable output rate | 4.1% | 0% |
+
+99.6%, not a suspicious 100% — genuinely reassuring, since the earlier
+(leaky-split) run's perfect score was exactly the kind of result that
+should raise an eyebrow, and turned out to have real (if partial)
+leakage behind it. The one miss here is a legitimate, understandable
+boundary case: *"error opening user profile"* — true label
+`registration_problems`, predicted `edit_account`. Both are reasonable
+readings of an ambiguous message, not a model malfunction.
 
 **Live qualitative testing (`src/inference/classify_live.py`):** on the
-original (leaky-split) adapter, handled negation and mid-message intent
-pivots correctly, but had no ability to reject genuinely out-of-scope
-input — three unrelated messages ("what's the weather today", "write me
-a python function...") all got confidently forced into a real, wrong
-label rather than any "doesn't apply" signal. Worth re-testing once the
-clean-split adapter is trained, and worth keeping as a stated limitation
-in the business-impact writeup either way — a deployed version needs a
-confidence threshold or explicit fallback, not blind trust in the
-27-label output.
+(now-superseded, leaky-split) adapter, handled negation and mid-message
+intent pivots correctly, but had no ability to reject genuinely
+out-of-scope input — three unrelated messages ("what's the weather
+today", "write me a python function...") all got confidently forced
+into a real, wrong label rather than any "doesn't apply" signal. Not
+yet re-tested on the clean-split adapter, but worth keeping as a stated
+limitation in the business-impact writeup regardless — a deployed
+version needs a confidence threshold or explicit fallback, not blind
+trust in the 27-label output.
 
 ## Key decisions and why
 

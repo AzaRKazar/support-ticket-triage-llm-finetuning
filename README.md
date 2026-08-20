@@ -37,16 +37,19 @@ In progress. QLoRA training and evaluation are complete:
 
 | Metric | Zero-shot baseline | Fine-tuned |
 |---|---|---|
-| Accuracy | 55.6% | 100% |
-| Macro F1 | 0.483 | 1.000 |
-| Weighted F1 | 0.483 | 1.000 |
+| Accuracy | 58.9% | 99.6% (269/270) |
+| Macro F1 | 0.538 | 0.996 |
+| Weighted F1 | 0.538 | 0.996 |
 
-(Same 270-example stratified sample for both; see `docs/README.md` for
-the honest caveat on what a perfect score on this specific, templated
-dataset does and doesn't imply.) Training ran on Google Colab, not Azure
-ML compute — Azure GPU quota never landed, local GPU throttled under
-sustained load, and a SeaWulf HPC detour was explored and abandoned; the
-full story is in the build log.
+(Same 270-example stratified sample for both, drawn from a deduplicated
+train/test split — an earlier version of this split had real text
+leakage between train and test, caught, investigated, and fixed at the
+source rather than papered over; see `docs/build-log.md`, 2026-08-18.
+The one fine-tuned miss is a genuinely ambiguous case, not a model
+malfunction.) Training ran on Google Colab, not Azure ML compute — Azure
+GPU quota never landed, local GPU throttled under sustained load, and a
+SeaWulf HPC detour was explored and abandoned; the full story is in the
+build log.
 
 See [`docs/build-log.md`](docs/build-log.md) for the running engineering
 log, including several real mistakes made and caught along the way, and

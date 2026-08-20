@@ -389,3 +389,38 @@ Small shift, as expected from different specific rows landing in the new
 270-example sample -- nothing alarming. Next: retrain on Colab with the
 deduplicated subset, then re-run the fine-tuned eval for the real,
 leak-free before/after comparison.
+
+## 2026-08-20 — Retrained on the deduplicated split; real leak-free numbers
+
+Reconnected to Colab (GPU quota had reset) and re-ran the full notebook
+top to bottom on the deduplicated dataset: same dedup counts as the
+local run (26,872 -> 24,635 rows, 20,939 train / 3,696 test, confirming
+the split is reproducible across environments), 9,990-example subset,
+313 steps, ~2h20m, loss 0.968 -> 0.117 -- same clean convergence pattern
+as the first run. Ran the in-notebook eval cell against the new adapter
+on the new 270-example sample while still connected (no separate local
+step needed this time), downloaded both the adapter and eval results,
+moved into `models/qlora-adapter/` and `results/finetuned/`.
+
+**Real result:**
+
+| Metric | Baseline (clean) | Fine-tuned (clean) |
+|---|---|---|
+| Accuracy | 58.9% | 99.6% (269/270) |
+| Macro F1 | 0.538 | 0.996 |
+| Weighted F1 | 0.538 | 0.996 |
+| Unparseable rate | 4.1% | 0% |
+
+269/270, not a suspicious 270/270 -- this is the reassuring outcome the
+whole leakage investigation was aiming for. The one miss: *"error
+opening user profile"* labeled `registration_problems`, predicted
+`edit_account` -- a genuinely ambiguous message, not a model failure.
+Checked by hand rather than trusted from the aggregate metric alone,
+same discipline as the earlier (leaky) 100% result.
+
+`README.md` and `docs/README.md` updated with the final numbers,
+replacing the placeholder/pending text from the leakage-investigation
+entries. This closes out Project 2a's core training and evaluation work.
+
+Next: business-impact writeup, then register the adapter to the Azure
+ML Model Registry.

@@ -1,11 +1,11 @@
 {
-  "model": "Qwen/Qwen2.5-1.5B-Instruct + QLoRA adapter (1 epoch, 9990 examples, Colab T4)",
+  "model": "Qwen/Qwen2.5-1.5B-Instruct + QLoRA adapter (1 epoch, deduplicated subset)",
   "eval_type": "fine-tuned",
   "n_samples": 270,
   "samples_per_class": 10,
-  "accuracy": 1.0,
-  "macro_f1": 1.0,
-  "weighted_f1": 1.0,
+  "accuracy": 0.9962962962962963,
+  "macro_f1": 0.9962870138308736,
+  "weighted_f1": 0.9962870138308736,
   "unparseable_rate": 0.0,
   "per_class_report": {
     "cancel_order": {
@@ -93,9 +93,9 @@
       "support": 10.0
     },
     "edit_account": {
-      "precision": 1.0,
+      "precision": 0.9090909090909091,
       "recall": 1.0,
-      "f1-score": 1.0,
+      "f1-score": 0.9523809523809523,
       "support": 10.0
     },
     "get_invoice": {
@@ -136,8 +136,8 @@
     },
     "registration_problems": {
       "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
+      "recall": 0.9,
+      "f1-score": 0.9473684210526315,
       "support": 10.0
     },
     "review": {
@@ -170,17 +170,17 @@
       "f1-score": 1.0,
       "support": 10.0
     },
-    "accuracy": 1.0,
+    "accuracy": 0.9962962962962963,
     "macro avg": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
+      "precision": 0.9966329966329966,
+      "recall": 0.9962962962962962,
+      "f1-score": 0.9962870138308736,
       "support": 270.0
     },
     "weighted avg": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
+      "precision": 0.9966329966329968,
+      "recall": 0.9962962962962963,
+      "f1-score": 0.9962870138308736,
       "support": 270.0
     }
   }
